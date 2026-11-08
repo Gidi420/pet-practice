@@ -133,9 +133,23 @@ export async function boot() {
 }
 
 function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register(new URL('../sw.js', import.meta.url).href, { scope: './' }).catch(() => {});
-  }
+  if (!('serviceWorker' in navigator)) return;
+  // auto-reload once when a new service worker takes control (seamless updates)
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register(new URL('../sw.js', import.meta.url).href, { scope: './' })
+    .then((reg) => {
+      reg.update().catch(() => {});
+      // check again whenever the app returns to the foreground
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) reg.update().catch(() => {});
+      });
+    })
+    .catch(() => {});
 }
 
 boot();

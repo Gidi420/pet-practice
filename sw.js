@@ -1,7 +1,7 @@
 // sw.js — offline app shell + runtime caching of /lib (pdf.js engine, cMaps, fonts).
 // Bump CACHE_VERSION to force clients to pick up an update.
 
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const CACHE = `pet-cache-${CACHE_VERSION}`;
 
 // Core shell: everything needed to boot the app offline, incl. the pdf.js engine.
@@ -61,22 +61,28 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Navigations: serve the app shell (SPA), fall back to network.
-  if (req.mode === 'navigate') {
+  const isVendored = url.pathname.includes('/lib/') || url.pathname.includes('/icons/');
+  const isAppCode = !isVendored && /\.(?:js|mjs|css|webmanifest)$/.test(url.pathname);
+
+  // Navigations + the app's own code: network-first so updates reach the device
+  // as soon as it's online; fall back to cache when offline.
+  if (req.mode === 'navigate' || isAppCode) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE);
-      const shell = await cache.match('./index.html');
-      if (shell) {
-        // revalidate in background
-        fetch(req).then((res) => { if (res.ok) cache.put('./index.html', res.clone()); }).catch(() => {});
-        return shell;
+      const key = req.mode === 'navigate' ? './index.html' : req;
+      try {
+        const res = await fetch(req);
+        if (res && res.ok) cache.put(key, res.clone());
+        return res;
+      } catch {
+        const cached = await cache.match(key);
+        return cached || new Response('Offline', { status: 503 });
       }
-      try { return await fetch(req); } catch { return new Response('Offline', { status: 503 }); }
     })());
     return;
   }
 
-  // Everything else (app files, lib, cMaps, fonts, icons): cache-first.
+  // Vendored assets (pdf.js, cMaps, fonts, icons): cache-first (immutable).
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(req);

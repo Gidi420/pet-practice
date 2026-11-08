@@ -1,7 +1,7 @@
 // config.js — static configuration: topic labels, domains, default timings,
 // exam date, i18n strings. No side effects beyond reading localStorage.
 
-export const APP_VERSION = '1.0.3';
+export const APP_VERSION = '1.0.4';
 
 export const DOMAINS = ['verbal', 'quant'];
 

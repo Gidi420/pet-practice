@@ -1,0 +1,10 @@
+# Device-only data — never commit (contains NITE copyrighted material)
+/private/
+*.pdf
+*.answers.json
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.log
+node_modules/

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PET Practice — scoring tests</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; max-width: 680px; margin: 24px auto; padding: 0 16px; }
+    h1 { font-size: 20px; }
+    .row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 8px; margin: 4px 0; font-size: 14px; }
+    .pass { background: #e8f5ee; } .fail { background: #fcebe7; color: #a21; }
+    .tag { font-weight: 700; }
+    #summary { font-size: 16px; font-weight: 700; margin: 14px 0; }
+    code { background: #f2f2ee; padding: 1px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>scoring.js — unit checks</h1>
+  <p>Verifies <code>scoring.js</code> against NITE's own worked example for
+     <code>nite-2025-winter-he</code> (raw verbal 21 → V 91, raw quant 34 → Q 138,
+     two-domain weighted 114.5 in the 555–580 general range). Score tables below are
+     an inline test fixture.</p>
+  <div id="summary">running…</div>
+  <div id="out"></div>
+
+  <script type="module">
+    import { scaledScore, weightedScores, generalScore, estimateFromRaw } from './js/scoring.js';
+
+    // --- inline fixture: published score-conversion tables for nite-2025-winter-he
+    const scoring = {
+      rawToScaled: {
+        verbal: [50,51,52,53,54,56,58,60,62,64,66,68,70,73,75,77,79,81,84,86,88,91,93,96,98,101,103,105,108,110,112,114,117,119,122,124,126,129,131,134,136,138,141,143,146,148,150],
+        quant:  [50,52,54,56,58,60,62,65,67,70,72,75,77,80,82,85,88,91,93,96,99,102,105,108,111,114,117,120,122,125,128,131,133,136,138,141,143,145,146,148,150],
+      },
+      maxRaw: { verbal: 46, quant: 40 },
+      weighted: { general: '(V+Q)/2', verbalEmphasis: '(3V+Q)/4', quantEmphasis: '(3Q+V)/4' },
+      weightedToGeneral: [
+        { weightedFrom: 50.0, weightedTo: 50.0, generalFrom: 200, generalTo: 200 },
+        { weightedFrom: 50.5, weightedTo: 55.0, generalFrom: 201, generalTo: 233 },
+        { weightedFrom: 55.5, weightedTo: 60.0, generalFrom: 234, generalTo: 267 },
+        { weightedFrom: 60.5, weightedTo: 65.0, generalFrom: 268, generalTo: 300 },
+        { weightedFrom: 65.5, weightedTo: 70.0, generalFrom: 301, generalTo: 334 },
+        { weightedFrom: 70.5, weightedTo: 75.0, generalFrom: 335, generalTo: 367 },
+        { weightedFrom: 75.5, weightedTo: 80.0, generalFrom: 368, generalTo: 395 },
+        { weightedFrom: 80.5, weightedTo: 85.0, generalFrom: 396, generalTo: 421 },
+        { weightedFrom: 85.5, weightedTo: 90.0, generalFrom: 422, generalTo: 448 },
+        { weightedFrom: 90.5, weightedTo: 95.0, generalFrom: 449, generalTo: 474 },
+        { weightedFrom: 95.5, weightedTo: 100.0, generalFrom: 475, generalTo: 501 },
+        { weightedFrom: 100.5, weightedTo: 105.0, generalFrom: 502, generalTo: 527 },
+        { weightedFrom: 105.5, weightedTo: 110.0, generalFrom: 528, generalTo: 554 },
+        { weightedFrom: 110.5, weightedTo: 115.0, generalFrom: 555, generalTo: 580 },
+        { weightedFrom: 115.5, weightedTo: 120.0, generalFrom: 581, generalTo: 607 },
+        { weightedFrom: 120.5, weightedTo: 125.0, generalFrom: 608, generalTo: 634 },
+        { weightedFrom: 125.5, weightedTo: 130.0, generalFrom: 635, generalTo: 660 },
+        { weightedFrom: 130.5, weightedTo: 135.0, generalFrom: 661, generalTo: 687 },
+        { weightedFrom: 135.5, weightedTo: 140.0, generalFrom: 688, generalTo: 713 },
+        { weightedFrom: 140.5, weightedTo: 145.0, generalFrom: 714, generalTo: 751 },
+        { weightedFrom: 145.5, weightedTo: 149.5, generalFrom: 752, generalTo: 795 },
+        { weightedFrom: 150.0, weightedTo: 150.0, generalFrom: 800, generalTo: 800 },
+      ],
+    };
+
+    const out = document.getElementById('out');
+    let pass = 0, fail = 0;
+    function check(name, got, cond) {
+      const ok = cond(got);
+      if (ok) pass++; else fail++;
+      const row = document.createElement('div');
+      row.className = 'row ' + (ok ? 'pass' : 'fail');
+      row.innerHTML = `<span class="tag">${ok ? 'PASS' : 'FAIL'}</span><span>${name}</span><span>got: <code>${JSON.stringify(got)}</code></span>`;
+      out.appendChild(row);
+    }
+
+    const V = scaledScore(scoring, 'verbal', 21);
+    const Q = scaledScore(scoring, 'quant', 34);
+    const est = estimateFromRaw(scoring, 21, 34);
+
+    check('raw verbal 21 → V = 91', V, (x) => x === 91);
+    check('raw quant 34 → Q = 138', Q, (x) => x === 138);
+    check('weighted two-domain = 114.5', est.weighted.twoDomain, (x) => x === 114.5);
+    check('general two-domain in 555..580', est.general.twoDomain, (x) => x >= 555 && x <= 580);
+    check('clamp: raw quant 45 → 150 (maxRaw 40)', scaledScore(scoring, 'quant', 45), (x) => x === 150);
+    check('clamp: raw verbal 99 → 150 (maxRaw 46)', scaledScore(scoring, 'verbal', 99), (x) => x === 150);
+    check('endpoint: weighted 50 → general 200', generalScore(scoring, 50), (x) => x === 200);
+    check('endpoint: weighted 150 → general 800', generalScore(scoring, 150), (x) => x === 800);
+    check('verbalEmphasis formula (3V+Q)/4', weightedScores(91, 138).verbalEmphasis, (x) => x === (3*91+138)/4);
+    check('quantEmphasis formula (3Q+V)/4', weightedScores(91, 138).quantEmphasis, (x) => x === (3*138+91)/4);
+    check('general estimates are valid 200..800', est.general, (g) => [g.twoDomain, g.verbalEmphasis, g.quantEmphasis].every((v) => v >= 200 && v <= 800));
+    check('interpolation within range (114.5 ≈ 577)', est.general.twoDomain, (x) => Math.abs(x - 577) <= 1);
+
+    const sum = document.getElementById('summary');
+    sum.textContent = `${pass} passed, ${fail} failed`;
+    sum.style.color = fail ? '#a21' : '#2d6a4f';
+  </script>
+</body>
+</html>

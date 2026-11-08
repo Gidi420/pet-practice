@@ -1,7 +1,7 @@
 // sw.js — offline app shell + runtime caching of /lib (pdf.js engine, cMaps, fonts).
 // Bump CACHE_VERSION to force clients to pick up an update.
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE = `pet-cache-${CACHE_VERSION}`;
 
 // Core shell: everything needed to boot the app offline, incl. the pdf.js engine.

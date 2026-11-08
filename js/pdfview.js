@@ -82,7 +82,8 @@ function touchCache(key, value) {
 // Render a page to an offscreen canvas sized to cssWidth * dpr (capped).
 export async function renderPage(testId, pageNum, cssWidth) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  const widthPx = Math.round(cssWidth * dpr);
+  // cap device pixels so deep zoom stays within a sane memory budget
+  const widthPx = Math.min(Math.round(cssWidth * dpr), 2200);
   const key = cacheKey(testId, pageNum, widthPx);
   const hit = RENDER_CACHE.get(key);
   if (hit) { touchCache(key, hit); return hit; }
@@ -100,7 +101,8 @@ export async function renderPage(testId, pageNum, cssWidth) {
   const ctx = canvas.getContext('2d', { alpha: false });
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  const value = { canvas, cssW: cssWidth, cssH: Math.round(viewport.height / dpr), widthPx };
+  // derive CSS height from the rendered aspect ratio so the width cap never distorts it
+  const value = { canvas, cssW: cssWidth, cssH: Math.round(cssWidth * canvas.height / canvas.width), widthPx };
   touchCache(key, value);
   return value;
 }
@@ -121,16 +123,19 @@ export function clearDocCache() {
 
 export class PageViewer {
   // container: element to fill. opts: { onPageChange(page), invert }
+  // The page renders at full width inside a vertically-scrollable stage, so the
+  // whole page (all questions) is reachable. Zoom re-renders at a wider size and
+  // the stage scrolls in both axes.
   constructor(container, opts = {}) {
     this.container = container;
     this.onPageChange = opts.onPageChange || (() => {});
     this.invert = !!opts.invert;
     this.testId = null;
     this.first = 1; this.last = 1; this.page = 1;
-    this.scale = 1; this.tx = 0; this.ty = 0;
+    this.zoom = 1;
     this._pointers = new Map();
-    this._pinchStart = null;
-    this._panStart = null;
+    this._pinch = null;
+    this._pinchTarget = null;
 
     container.classList.add('pageviewer');
     this.stage = document.createElement('div');
@@ -152,30 +157,36 @@ export class PageViewer {
   async setSource(testId, range) {
     this.testId = testId;
     this.first = range.first; this.last = range.last;
+    this.zoom = 1;
     await this.showPage(range.page ?? range.first);
   }
 
-  get cssWidth() { return this.container.clientWidth || window.innerWidth; }
+  get cssWidth() { return this.stage.clientWidth || this.container.clientWidth || window.innerWidth; }
 
-  async showPage(pageNum, { resetZoom = true } = {}) {
+  async showPage(pageNum, { keepZoom = false } = {}) {
     const p = Math.max(this.first, Math.min(pageNum, this.last));
     this.page = p;
-    if (resetZoom) { this.scale = 1; this.tx = 0; this.ty = 0; this._applyTransform(); }
+    if (!keepZoom) this.zoom = 1;
+    this.inner.style.transform = '';
     this.spinner.style.display = 'flex';
     try {
-      const { canvas, cssW, cssH } = await renderPage(this.testId, p, this.cssWidth);
+      const renderW = Math.round(this.cssWidth * this.zoom);
+      const { canvas, cssW, cssH } = await renderPage(this.testId, p, renderW);
       this.inner.innerHTML = '';
       canvas.style.width = cssW + 'px';
       canvas.style.height = cssH + 'px';
+      this.inner.style.width = cssW + 'px';
       this.inner.classList.toggle('pv-invert', this.invert);
       this.inner.appendChild(canvas);
+      this.stage.scrollTop = 0;
+      this.stage.scrollLeft = Math.max(0, (cssW - this.stage.clientWidth) / 2);
     } catch (e) {
       this.inner.innerHTML = `<div class="pv-error">שגיאה בטעינת העמוד<br><small>${e.message || e}</small></div>`;
     } finally {
       this.spinner.style.display = 'none';
     }
     this.onPageChange(p);
-    // pre-render neighbours
+    // pre-render neighbours at base width
     if (p + 1 <= this.last) prefetch(this.testId, p + 1, this.cssWidth);
     if (p - 1 >= this.first) prefetch(this.testId, p - 1, this.cssWidth);
   }
@@ -185,26 +196,27 @@ export class PageViewer {
   prev() { if (this.canPrev()) this.showPage(this.page - 1); }
   next() { if (this.canNext()) this.showPage(this.page + 1); }
 
-  _applyTransform() {
-    this.inner.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.scale})`;
+  async setZoom(z) {
+    z = Math.max(1, Math.min(z, 4));
+    this.inner.style.transform = '';
+    if (Math.abs(z - this.zoom) < 0.02) return;
+    this.zoom = z;
+    await this.showPage(this.page, { keepZoom: true });
   }
 
   _bindGestures() {
     const el = this.stage;
-    el.style.touchAction = 'pan-y';
+    // allow native 1-finger scroll (both axes); we handle 2-finger pinch ourselves
+    el.style.touchAction = 'pan-x pan-y';
 
     const onDown = (e) => {
-      el.setPointerCapture?.(e.pointerId);
       this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this._pointers.size === 2) {
         const pts = [...this._pointers.values()];
-        this._pinchStart = {
-          dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
-          scale: this.scale,
-        };
+        this._pinch = { dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y), zoom: this.zoom };
+        this._pinchTarget = this.zoom;
         this._swipe = null;
       } else if (this._pointers.size === 1) {
-        this._panStart = { x: e.clientX, y: e.clientY, tx: this.tx, ty: this.ty };
         this._swipe = { x0: e.clientX, y0: e.clientY, t0: Date.now() };
       }
     };
@@ -212,20 +224,14 @@ export class PageViewer {
     const onMove = (e) => {
       if (!this._pointers.has(e.pointerId)) return;
       this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      if (this._pointers.size === 2 && this._pinchStart) {
+      if (this._pointers.size === 2 && this._pinch) {
         const pts = [...this._pointers.values()];
         const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        let s = this._pinchStart.scale * (dist / this._pinchStart.dist);
-        s = Math.max(1, Math.min(s, 5));
-        this.scale = s;
-        if (s === 1) { this.tx = 0; this.ty = 0; }
-        this._applyTransform();
-        e.preventDefault();
-      } else if (this._pointers.size === 1 && this.scale > 1 && this._panStart) {
-        this.tx = this._panStart.tx + (e.clientX - this._panStart.x);
-        this.ty = this._panStart.ty + (e.clientY - this._panStart.y);
-        this._applyTransform();
+        const target = Math.max(1, Math.min(this._pinch.zoom * (dist / this._pinch.dist), 4));
+        this._pinchTarget = target;
+        // live visual feedback relative to the currently-rendered zoom
+        this.inner.style.transformOrigin = 'center top';
+        this.inner.style.transform = `scale(${target / this.zoom})`;
         e.preventDefault();
       }
     };
@@ -233,34 +239,35 @@ export class PageViewer {
     const onUp = (e) => {
       const was = this._pointers.get(e.pointerId);
       this._pointers.delete(e.pointerId);
-      if (this._pointers.size < 2) this._pinchStart = null;
-
-      // swipe to change page (only when not zoomed)
-      if (this.scale === 1 && this._swipe && was) {
+      if (this._pinch && this._pointers.size < 2) {
+        const target = this._pinchTarget || this.zoom;
+        this._pinch = null; this._pinchTarget = null;
+        this.setZoom(target);
+        this._swipe = null;
+        return;
+      }
+      // horizontal swipe to change page — only when not zoomed (no horizontal scroll then)
+      if (this.zoom <= 1.02 && this._swipe && was && this._pointers.size === 0) {
         const dx = e.clientX - this._swipe.x0;
         const dy = e.clientY - this._swipe.y0;
         const dt = Date.now() - this._swipe.t0;
-        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 600) {
-          // RTL note: physical swipe direction is kept intuitive.
+        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.8 && dt < 700) {
           if (dx < 0) this.next(); else this.prev();
         }
       }
       this._swipe = null;
-      this._panStart = null;
     };
 
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointermove', onMove, { passive: false });
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onUp);
-    // double-tap to toggle zoom
+    // double-tap toggles zoom
     let lastTap = 0;
-    el.addEventListener('pointerup', (e) => {
+    el.addEventListener('pointerup', () => {
       const now = Date.now();
       if (now - lastTap < 300 && this._pointers.size === 0) {
-        if (this.scale > 1) { this.scale = 1; this.tx = 0; this.ty = 0; }
-        else { this.scale = 2.2; }
-        this._applyTransform();
+        this.setZoom(this.zoom > 1.02 ? 1 : 2.2);
       }
       lastTap = now;
     });

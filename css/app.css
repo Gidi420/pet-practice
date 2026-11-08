@@ -164,9 +164,10 @@ a { color: inherit; text-decoration: none; }
 :root[data-theme="dark"] .chip.active { color: #0e1512; }
 
 /* ---- filters ---- */
-.filters { padding: 8px 12px 4px; }
-.filter-line { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.filters { padding: 6px 12px 2px; }
+.filter-line { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .filter-label { font-size: 12px; color: var(--ink3); min-width: 42px; }
+.filters .chip { min-height: 32px; padding: 5px 12px; font-size: 13px; }
 
 /* ============ QUESTION RUNNER ============ */
 .qscreen { display: flex; flex-direction: column; height: calc(100dvh - var(--tabbar-h) - var(--safe-bottom)); padding-top: var(--safe-top); }
@@ -189,9 +190,9 @@ a { color: inherit; text-decoration: none; }
 .q-viewerwrap { position: relative; flex: 1 1 auto; min-height: 0; margin: 0 8px; }
 .q-viewer { position: absolute; inset: 0; }
 .pageviewer { width: 100%; height: 100%; }
-.pv-stage { width: 100%; height: 100%; overflow: hidden; display: flex; align-items: flex-start; justify-content: center; background: var(--surface2); border-radius: 12px; }
-.pv-inner { transform-origin: center top; will-change: transform; max-width: 100%; }
-.pv-inner canvas { display: block; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.12); background: #fff; }
+.pv-stage { width: 100%; height: 100%; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; background: var(--surface2); border-radius: 12px; }
+.pv-inner { margin: 0 auto; width: 100%; will-change: transform; }
+.pv-inner canvas { display: block; width: 100%; height: auto; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.12); background: #fff; }
 .pv-invert canvas { filter: invert(1) hue-rotate(180deg); }
 .pv-spinner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: var(--ink3); font-size: 28px; }
 .pv-error { padding: 20px; color: var(--coral); text-align: center; }

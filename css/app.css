@@ -202,7 +202,9 @@ a { color: inherit; text-decoration: none; }
 .q-prev { right: 4px; } /* RTL: prev on the right */
 .q-next { left: 4px; }
 
-.q-bottom { flex: 0 0 auto; padding: 8px 12px calc(10px + var(--safe-bottom)); background: var(--surface); border-top: 1px solid var(--line); }
+.q-bottom { flex: 0 0 auto; padding: 8px 12px 10px; background: var(--surface); border-top: 1px solid var(--line); }
+/* only the chromeless simulation screen sits directly on the home indicator */
+body.chromeless .q-bottom { padding-bottom: calc(10px + var(--safe-bottom)); }
 .q-answers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .ansbtn { height: 54px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font-size: 22px; font-weight: 700; border-radius: 14px; font-family: inherit; transition: transform .12s, background .15s, border-color .15s; }
 .ansbtn:active { transform: scale(0.96); }

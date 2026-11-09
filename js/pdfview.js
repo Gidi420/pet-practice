@@ -149,8 +149,66 @@ export class PageViewer {
     this.spinner.textContent = '…';
     container.appendChild(this.spinner);
 
+    // zoom controls — shown only for mouse/trackpad users (CSS media query)
+    const zbtn = (txt, label, fn) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = txt; b.setAttribute('aria-label', label);
+      b.addEventListener('click', fn);
+      return b;
+    };
+    this.zoomLabel = document.createElement('span');
+    this.zoomLabel.className = 'pv-zoomlabel';
+    this.zoomBar = document.createElement('div');
+    this.zoomBar.className = 'pv-zoom';
+    this.zoomBar.append(
+      zbtn('−', 'zoom out', () => this.zoomBy(1 / 1.2)),
+      this.zoomLabel,
+      zbtn('+', 'zoom in', () => this.zoomBy(1.2)),
+    );
+    this.zoomLabel.addEventListener('click', () => this.setZoom(1));
+    container.appendChild(this.zoomBar);
+
     this._bindGestures();
+
+    // re-render when the available width changes (desktop window resize, rotation)
+    this._lastW = 0;
+    if ('ResizeObserver' in window) {
+      let rT = null;
+      this._ro = new ResizeObserver(() => {
+        const w = this.cssWidth;
+        if (!this.testId || !this._lastW || Math.abs(w - this._lastW) < 8) { this._lastW = this._lastW || w; return; }
+        clearTimeout(rT);
+        rT = setTimeout(() => { this._lastW = this.cssWidth; this.showPage(this.page, { keepZoom: true }); }, 200);
+      });
+      this._ro.observe(this.stage);
+    }
   }
+
+  // mouse users may shrink below fit-width to see a whole page at once
+  get minZoom() { return window.matchMedia('(pointer: fine)').matches ? 0.5 : 1; }
+
+  zoomBy(f) { return this.setZoom(this.zoom * f); }
+
+  // Keyboard handling shared by all question screens. Returns true if handled.
+  handleKey(e) {
+    const rtl = document.documentElement.dir === 'rtl';
+    switch (e.key) {
+      case 'ArrowLeft': rtl ? this.next() : this.prev(); return true;
+      case 'ArrowRight': rtl ? this.prev() : this.next(); return true;
+      case 'ArrowDown': this.stage.scrollBy({ top: 90 }); return true;
+      case 'ArrowUp': this.stage.scrollBy({ top: -90 }); return true;
+      case 'PageDown': case ' ': this.stage.scrollBy({ top: this.stage.clientHeight * 0.85, behavior: 'smooth' }); return true;
+      case 'PageUp': this.stage.scrollBy({ top: -this.stage.clientHeight * 0.85, behavior: 'smooth' }); return true;
+      case 'Home': this.stage.scrollTo({ top: 0 }); return true;
+      case 'End': this.stage.scrollTo({ top: this.stage.scrollHeight }); return true;
+      case '+': case '=': this.zoomBy(1.2); return true;
+      case '-': case '_': this.zoomBy(1 / 1.2); return true;
+      case '0': this.setZoom(1); return true;
+    }
+    return false;
+  }
+
+  _updateZoomLabel() { this.zoomLabel.textContent = Math.round(this.zoom * 100) + '%'; }
 
   setInvert(on) { this.invert = on; this.inner.classList.toggle('pv-invert', on); }
 
@@ -161,7 +219,13 @@ export class PageViewer {
     await this.showPage(range.page ?? range.first);
   }
 
-  get cssWidth() { return this.stage.clientWidth || this.container.clientWidth || window.innerWidth; }
+  // Fit-width, but on wide desktop screens cap it so an A4 page stays readable
+  // without a huge amount of scrolling.
+  get cssWidth() {
+    const w = this.stage.clientWidth || this.container.clientWidth || window.innerWidth;
+    // -1: clientWidth is rounded, so a fractional stage width would otherwise overflow by <1px
+    return Math.min(w - 1, 880);
+  }
 
   async showPage(pageNum, { keepZoom = false } = {}) {
     const p = Math.max(this.first, Math.min(pageNum, this.last));
@@ -170,6 +234,7 @@ export class PageViewer {
     this.inner.style.transform = '';
     this.spinner.style.display = 'flex';
     try {
+      this._lastW = this.cssWidth;
       const renderW = Math.round(this.cssWidth * this.zoom);
       const { canvas, cssW, cssH } = await renderPage(this.testId, p, renderW);
       this.inner.innerHTML = '';
@@ -178,8 +243,9 @@ export class PageViewer {
       this.inner.style.width = cssW + 'px';
       this.inner.classList.toggle('pv-invert', this.invert);
       this.inner.appendChild(canvas);
-      this.stage.scrollTop = 0;
+      if (!keepZoom) this.stage.scrollTop = 0;
       this.stage.scrollLeft = Math.max(0, (cssW - this.stage.clientWidth) / 2);
+      this._updateZoomLabel();
     } catch (e) {
       this.inner.innerHTML = `<div class="pv-error">שגיאה בטעינת העמוד<br><small>${e.message || e}</small></div>`;
     } finally {
@@ -197,11 +263,15 @@ export class PageViewer {
   next() { if (this.canNext()) this.showPage(this.page + 1); }
 
   async setZoom(z) {
-    z = Math.max(1, Math.min(z, 4));
+    z = Math.max(this.minZoom, Math.min(z, 4));
     this.inner.style.transform = '';
     if (Math.abs(z - this.zoom) < 0.02) return;
+    // keep the same relative scroll position across the re-render
+    const st = this.stage;
+    const relY = st.scrollHeight > st.clientHeight ? st.scrollTop / st.scrollHeight : 0;
     this.zoom = z;
     await this.showPage(this.page, { keepZoom: true });
+    st.scrollTop = relY * st.scrollHeight;
   }
 
   _bindGestures() {
@@ -258,6 +328,19 @@ export class PageViewer {
       this._swipe = null;
     };
 
+    // ctrl/⌘ + wheel (and trackpad pinch, which browsers report as ctrl+wheel) zooms
+    let wheelT = null, wheelTarget = null;
+    el.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const base = wheelTarget ?? this.zoom;
+      wheelTarget = Math.max(this.minZoom, Math.min(base * Math.exp(-e.deltaY * 0.01), 4));
+      this.inner.style.transformOrigin = 'center top';
+      this.inner.style.transform = `scale(${wheelTarget / this.zoom})`;
+      clearTimeout(wheelT);
+      wheelT = setTimeout(() => { const z = wheelTarget; wheelTarget = null; this.setZoom(z); }, 180);
+    }, { passive: false });
+
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointermove', onMove, { passive: false });
     el.addEventListener('pointerup', onUp);
@@ -274,6 +357,7 @@ export class PageViewer {
   }
 
   destroy() {
+    if (this._ro) { this._ro.disconnect(); this._ro = null; }
     this._pointers.clear();
     this.container.innerHTML = '';
     this.container.classList.remove('pageviewer');

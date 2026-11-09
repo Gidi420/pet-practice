@@ -1,7 +1,7 @@
 // modes/simulation.js — timed section / full-test simulation with free
 // navigation, a question grid, continuous save/resume, and scored results.
 
-import { h, clear, confirmDialog, sheet as bottomSheet, haptic, toast, pct } from '../ui.js';
+import { h, clear, confirmDialog, sheet as bottomSheet, haptic, toast, pct, bindKeys, answerKey } from '../ui.js';
 import { t, domainLabel, topicLabel, getSettings } from '../config.js';
 import { getReadyTests, questionsForSheet } from '../tests.js';
 import * as db from '../db.js';
@@ -166,9 +166,21 @@ async function runSimulation(root, state) {
   const prevQBtn = h('button', { class: 'act-btn', text: '← ' + t('q.question'), onclick: () => gotoQ(currentQ - 1) });
   const nextQBtn = h('button', { class: 'act-btn act-next', text: t('q.question') + ' →', onclick: () => gotoQ(currentQ + 1) });
   const actions = h('div', { class: 'q-actions sim-actions' }, prevQBtn, flagBtn, nextQBtn);
-  const bottom = h('div', { class: 'q-bottom' }, answersEl, actions);
+  const bottom = h('div', { class: 'q-bottom' }, answersEl, actions, h('div', { class: 'kbd-hint', text: t('kbd.sim') }));
 
   screen.append(topbar, posEl, viewerWrap, bottom);
+
+  // desktop keyboard shortcuts
+  const unbindKeys = bindKeys((e) => {
+    if (destroyed) return false;
+    const n = answerKey(e);
+    if (n) { selectAnswer(n); return true; }
+    if (e.key === 'Enter') { gotoQ(currentQ + (e.shiftKey ? -1 : 1)); return true; }
+    if (e.code === 'KeyF') { toggleFlag(); return true; }
+    if (e.code === 'KeyG') { openGrid(); return true; }
+    if (viewer && viewer.handleKey(e)) return true;
+    return false;
+  });
   clear(root).appendChild(screen);
 
   // ---- timer (endTime based)
@@ -294,6 +306,7 @@ async function runSimulation(root, state) {
 
   function cleanup() {
     destroyed = true;
+    unbindKeys();
     document.removeEventListener('visibilitychange', onVisibility);
     if (countdown) countdown.stop();
     if (viewer) viewer.destroy();

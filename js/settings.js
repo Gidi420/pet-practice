@@ -75,12 +75,36 @@ export async function renderSettings(root) {
   ]));
 
   // About
+  const installSlot = h('div', {});
+  const renderInstall = () => {
+    clear(installSlot);
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    const desktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (standalone) {
+      if (desktop) installSlot.appendChild(h('p', { class: 'muted small', text: '✓ ' + t('set.installed') }));
+    } else if (window.__installPrompt) {
+      installSlot.appendChild(h('button', { class: 'btn btn-secondary wide', text: '⤓ ' + t('set.install'), onclick: async () => {
+        const p = window.__installPrompt;
+        if (!p) return;
+        p.prompt();
+        try { await p.userChoice; } catch {}
+        window.__installPrompt = null;
+        renderInstall();
+      }}));
+    } else if (desktop) {
+      installSlot.appendChild(h('p', { class: 'muted small', text: t('set.installHint') }));
+    }
+  };
+  renderInstall();
+  document.addEventListener('install-available', renderInstall);
+
   wrap.appendChild(card(t('set.about'), [
     settingRow(t('set.version'), h('span', { class: 'muted', text: APP_VERSION })),
+    installSlot,
   ]));
 
   clear(root).appendChild(wrap);
-  return { destroy() {} };
+  return { destroy() { document.removeEventListener('install-available', renderInstall); } };
 }
 
 async function showStorage(el) {

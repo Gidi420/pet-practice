@@ -73,6 +73,29 @@ export function sheet(contentFn) {
   return close;
 }
 
+// Global keyboard shortcuts for a screen. handler(e) returns true when it used
+// the key. Ignored while typing in a field, with ctrl/⌘/alt held, or while a
+// dialog or sheet is open.
+export function bindKeys(handler) {
+  const onKey = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    const tg = e.target;
+    if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return;
+    if (document.querySelector('.sheet-overlay, .modal-overlay')) return;
+    // a focused button / link keeps its native Enter & Space activation
+    if ((e.key === 'Enter' || e.key === ' ') && tg && /^(BUTTON|A)$/.test(tg.tagName)) return;
+    if (handler(e)) e.preventDefault();
+  };
+  document.addEventListener('keydown', onKey);
+  return () => document.removeEventListener('keydown', onKey);
+}
+
+// Number key 1–4 from the top row or numpad, independent of keyboard layout.
+export function answerKey(e) {
+  const m = /^(?:Digit|Numpad)([1-4])$/.exec(e.code || '');
+  return m ? Number(m[1]) : null;
+}
+
 export function pct(x) { return Math.round((x || 0) * 100) + '%'; }
 
 export function segmented(options, value, onChange) {

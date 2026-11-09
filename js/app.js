@@ -62,6 +62,11 @@ document.addEventListener('settings-changed', () => { applyAppearance(); renderT
 
 function renderTabbar(activeTab) {
   clear(tabbarEl);
+  // brand header — only visible in the desktop sidebar layout
+  tabbarEl.appendChild(h('div', { class: 'tab-brand' },
+    h('img', { src: './icons/icon-192.png', alt: '' }),
+    h('span', { text: t('app.name') }),
+  ));
   for (const tab of TABS) {
     const a = h('a', { class: 'tab' + (tab.id === activeTab ? ' active' : ''), href: tab.route },
       h('span', { class: 'tab-icon', text: tab.icon }),
@@ -122,6 +127,23 @@ async function router() {
 }
 
 window.addEventListener('hashchange', router);
+
+// ---- desktop install (Chrome / Edge) ---------------------------------------
+// Keep the browser's install prompt so Settings can offer an "Install" button.
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.__installPrompt = e;
+  document.dispatchEvent(new CustomEvent('install-available'));
+});
+window.addEventListener('appinstalled', () => { window.__installPrompt = null; });
+
+// Escape closes the topmost sheet / dialog (desktop keyboard users)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const overlays = document.querySelectorAll('.sheet-overlay, .modal-overlay');
+  const top = overlays[overlays.length - 1];
+  if (top) { e.preventDefault(); top.click(); }
+});
 
 // ---- boot ------------------------------------------------------------------
 

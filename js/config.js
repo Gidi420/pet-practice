@@ -1,7 +1,7 @@
 // config.js — static configuration: topic labels, domains, default timings,
 // exam date, i18n strings. No side effects beyond reading localStorage.
 
-export const APP_VERSION = '1.0.5';
+export const APP_VERSION = '1.1.0';
 
 export const DOMAINS = ['verbal', 'quant'];
 
@@ -227,6 +227,13 @@ const STRINGS = {
   'set.storage':    { he: 'אחסון', en: 'Storage' },
   'set.about':      { he: 'אודות', en: 'About' },
   'set.version':    { he: 'גרסה', en: 'Version' },
+  'set.install':    { he: 'התקנה כאפליקציה במחשב', en: 'Install as desktop app' },
+  'set.installed':  { he: 'האפליקציה מותקנת', en: 'App is installed' },
+  'set.installHint':{ he: 'ב־Chrome או Edge: לחצו על סמל ההתקנה בשורת הכתובת.', en: 'In Chrome or Edge: click the install icon in the address bar.' },
+
+  // keyboard (desktop)
+  'kbd.practice':   { he: '1–4 תשובה · Enter הבא · F סימון · ←→ עמוד · +/− זום', en: '1–4 answer · Enter next · F flag · ←→ page · +/− zoom' },
+  'kbd.sim':        { he: '1–4 תשובה · Enter שאלה הבאה · Shift+Enter הקודמת · F סימון · G מפה · ←→ עמוד · +/− זום', en: '1–4 answer · Enter next q · Shift+Enter prev · F flag · G map · ←→ page · +/− zoom' },
 
   // tests management
   'tests.title':    { he: 'ניהול מבחנים', en: 'Tests' },

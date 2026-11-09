@@ -354,8 +354,8 @@ body.chromeless .q-bottom { padding-bottom: calc(10px + var(--safe-bottom)); }
 .reject-row ul { margin: 6px 0 0; padding-inline-start: 18px; }
 .match-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 
-/* ============ LANDSCAPE ============ */
-@media (orientation: landscape) and (max-height: 560px) {
+/* ============ LANDSCAPE (phones only) ============ */
+@media (orientation: landscape) and (max-height: 560px) and (pointer: coarse) {
   .qscreen { flex-direction: row; }
   .qscreen .q-topbar, .qscreen .q-header, .qscreen .q-timerbar, .qscreen .q-context { display: none; }
   .q-viewerwrap { flex: 1 1 62%; margin: 8px; }
@@ -364,6 +364,112 @@ body.chromeless .q-bottom { padding-bottom: calc(10px + var(--safe-bottom)); }
   .sim-run { }
 }
 
-@media (min-width: 700px) {
-  .qscreen, .sim-run { max-width: 720px; margin: 0 auto; }
+@media (min-width: 700px) and (max-width: 899.98px) {
+  .qscreen, .sim-run { max-width: 720px; margin: 0 auto; width: 100%; }
+}
+
+/* ============ DESKTOP / LARGE SCREENS ============ */
+.tab-brand, .kbd-hint, .pv-zoom { display: none; }
+.pv-stage { scrollbar-gutter: stable; }
+
+@media (min-width: 900px) {
+  :root { --side-w: 220px; }
+  body { flex-direction: row; }
+  .app-main { min-width: 0; }
+
+  /* tab bar → sidebar on the inline-start side (right in Hebrew) */
+  .tabbar {
+    order: -1; flex: 0 0 var(--side-w); width: var(--side-w); height: auto;
+    flex-direction: column; align-items: stretch; gap: 2px;
+    padding: calc(18px + var(--safe-top)) 12px 18px;
+    border-top: none; border-inline-end: 1px solid var(--line);
+  }
+  .tab {
+    flex: 0 0 auto; flex-direction: row; justify-content: flex-start; gap: 12px;
+    padding: 10px 14px; border-radius: 10px; font-size: 15px; font-weight: 600; color: var(--ink2);
+  }
+  .tab-icon { font-size: 18px; width: 22px; text-align: center; }
+  .tab.active { background: var(--green-light); color: var(--green); }
+  .tab-brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 18px; font-weight: 700; font-size: 16px; }
+  .tab-brand img { width: 34px; height: 34px; border-radius: 9px; }
+
+  .screen { max-width: 860px; padding: calc(28px + var(--safe-top)) 32px 40px; }
+  .toast { bottom: 28px; }
+
+  /* bottom sheets → centred dialogs */
+  .sheet-overlay { align-items: center; justify-content: center; padding: 24px; }
+  .sheet-panel { max-width: 620px; max-height: 88vh; border-radius: 18px; padding: 18px 20px; transform: translateY(16px); }
+  .sheet-overlay.open .sheet-panel { transform: none; }
+  .sheet-panel:has(.viewer-sheet) { max-width: 960px; }
+  .sheet-grip { display: none; }
+  .viewer-sheet { height: 82vh; }
+  .qgrid { grid-template-columns: repeat(10, 1fr); }
+
+  /* question screens: PDF on the main side, answer panel beside it */
+  .qscreen, .sim-run {
+    display: grid; grid-template-columns: minmax(0, 1fr) 300px;
+    max-width: none; margin: 0; width: 100%; padding-top: var(--safe-top);
+  }
+  .qscreen {
+    grid-template-rows: auto auto auto auto minmax(0, 1fr);
+    grid-template-areas: "top top" "head side" "timer side" "ctx side" "view side";
+  }
+  .sim-run {
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "top top" "pos side" "view side";
+  }
+  .q-topbar { grid-area: top; border-bottom: 1px solid var(--line); }
+  .q-topbar:empty { display: none; }
+  .q-header { grid-area: head; padding-top: 8px; font-size: 13px; }
+  .q-timerbar { grid-area: timer; }
+  .q-context { grid-area: ctx; }
+  .sim-topbar { grid-area: top; padding: 10px 16px; }
+  .sim-pos { grid-area: pos; }
+  .q-viewerwrap { grid-area: view; margin: 0 12px 12px; }
+  .filters { padding: 10px 16px 6px; }
+
+  .q-bottom {
+    grid-area: side; display: flex; flex-direction: column; gap: 14px;
+    padding: 18px 16px; border-top: none; border-inline-start: 1px solid var(--line);
+    overflow-y: auto; min-height: 0;
+  }
+  .q-answers { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ansbtn { height: 76px; font-size: 28px; }
+  .q-actions { flex-wrap: wrap; margin-top: 0; }
+  .q-actions:not(.sim-actions) .act-next { flex: 1 0 100%; margin-inline-start: 0; order: 3; }
+  .sim-actions .act-btn { flex: 1 1 0; padding: 0 8px; }
+  .sim-actions .act-next { margin-inline-start: 0; }
+  .q-feedback { font-size: 16px; }
+  .kbd-hint { margin-top: auto; font-size: 12px; line-height: 1.7; color: var(--ink3); }
+}
+
+/* mouse / trackpad niceties */
+@media (hover: hover) and (pointer: fine) {
+  button, .btn, .tab, .chip, .row-link { cursor: pointer; }
+  button:disabled { cursor: default; }
+  .btn:hover, .act-btn:not(:disabled):hover, .sim-gridbtn:hover, .sim-submit:hover, .sec-pick:hover { filter: brightness(0.96); }
+  :root[data-theme="dark"] .btn:hover, :root[data-theme="dark"] .act-btn:not(:disabled):hover { filter: brightness(1.12); }
+  .ansbtn:not(:disabled):not(.chosen):hover { border-color: var(--green-mid); background: var(--surface2); }
+  .chip:not(.active):hover { border-color: var(--ink3); color: var(--ink); }
+  .tab:not(.active):hover { color: var(--ink); }
+  .qcell:hover { outline: 2px solid var(--green-mid); }
+  .review-item:hover, .sim-hist-item:hover, .test-row:hover { filter: brightness(0.98); }
+  .q-pagebtn:not(:disabled):hover { background: var(--surface); }
+
+  .kbd-hint { display: block; }
+  .pv-zoom {
+    display: flex; align-items: center; gap: 2px; direction: ltr;
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 4;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-pill);
+    box-shadow: 0 2px 10px rgba(0,0,0,.12); padding: 3px;
+  }
+  .pv-zoom button {
+    width: 32px; height: 32px; border: none; border-radius: 50%; background: transparent;
+    color: var(--ink); font-size: 18px; font-family: inherit; line-height: 1;
+  }
+  .pv-zoom button:hover { background: var(--surface2); }
+  .pv-zoomlabel { min-width: 48px; text-align: center; font-size: 12px; font-weight: 600; color: var(--ink2); cursor: pointer; font-variant-numeric: tabular-nums; }
+}
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
+  .tab:not(.active):hover { background: var(--surface2); }
 }

@@ -1,7 +1,7 @@
 // question.js — shared single-question runner for Practice / Timed / Review.
 // Handles the PDF viewer, answer buttons, feedback, flag, timing and logging.
 
-import { h, clear, haptic } from './ui.js';
+import { h, clear, haptic, bindKeys, answerKey } from './ui.js';
 import { PageViewer } from './pdfview.js';
 import { t, domainLabel, topicLabel, getSettings } from './config.js';
 import { logAttempt, newSessionId } from './stats.js';
@@ -64,7 +64,8 @@ export function mountQuestionRunner(root, config) {
   const nextBtn = h('button', { class: 'act-btn act-next', text: t('common.next'), onclick: loadNext, disabled: true });
   const actions = h('div', { class: 'q-actions' }, flagBtn, feedback, nextBtn);
 
-  const bottom = h('div', { class: 'q-bottom' }, answersEl, actions);
+  const kbdHint = h('div', { class: 'kbd-hint', text: t('kbd.practice') });
+  const bottom = h('div', { class: 'q-bottom' }, answersEl, actions, kbdHint);
 
   screen.append(topbarSlot, header, timerBar, context, viewerWrap, bottom);
   clear(root).appendChild(screen);
@@ -227,11 +228,30 @@ export function mountQuestionRunner(root, config) {
   document.addEventListener('settings-changed', onSettings);
   document.addEventListener('theme-changed', onSettings);
 
+  // desktop keyboard shortcuts
+  const unbindKeys = bindKeys((e) => {
+    // runners mounted outside the router (e.g. "practise the wrong ones") clean up here
+    if (!screen.isConnected) { unbindKeys(); return false; }
+    if (!current) return false;
+    const n = answerKey(e);
+    if (n) { if (!answered) onAnswer(n); return true; }
+    if (e.key === 'Enter') {
+      // let a focused button handle its own Enter
+      if (e.target && /^(BUTTON|A)$/.test(e.target.tagName)) return false;
+      if (answered && !nextBtn.disabled) loadNext();
+      return true;
+    }
+    if (e.code === 'KeyF') { toggleFlag(); return true; }
+    if (viewer && viewer.handleKey(e)) return true;
+    return false;
+  });
+
   loadNext();
 
   return {
     loadNext,
     destroy() {
+      unbindKeys();
       if (countdown) countdown.stop();
       document.removeEventListener('settings-changed', onSettings);
       document.removeEventListener('theme-changed', onSettings);

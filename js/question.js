@@ -23,6 +23,7 @@ export function mountQuestionRunner(root, config) {
   let stopwatch = new Stopwatch();
   let countdown = null;
   let answered = false;
+  let loadToken = 0;
 
   const screen = h('div', { class: 'qscreen' });
 
@@ -107,7 +108,9 @@ export function mountQuestionRunner(root, config) {
     flagBtn.classList.remove('flagged');
     if (countdown) { countdown.stop(); countdown = null; }
 
+    const token = ++loadToken;
     const q = await source.next();
+    if (token !== loadToken) return;
     if (!q) { showDone(); return; }
     current = q;
 
@@ -120,6 +123,7 @@ export function mountQuestionRunner(root, config) {
     viewer.setInvert(wantInvert());
     const startPage = q.isPassage ? q.passageStartPage : q.page;
     await viewer.setSource(q.testId, { first: q.pdfFirst, last: q.pdfLast, page: startPage });
+    if (token !== loadToken) return; // a newer loadNext() took over (e.g. a filter changed)
     updateLabel(); updateNav();
 
     stopwatch.reset().start();

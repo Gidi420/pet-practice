@@ -32,10 +32,19 @@ const FONT_URL = new URL('../lib/pdfjs/standard_fonts/', import.meta.url).href;
 const DOC_CACHE = new Map(); // testId -> { doc, used }
 const MAX_DOCS = 2;
 
-async function getDoc(testId) {
-  const cached = DOC_CACHE.get(testId);
-  if (cached) { cached.used = Date.now(); return cached.doc; }
+// concurrent first loads of the same PDF share one parse instead of opening it twice
+const DOC_LOADING = new Map(); // testId -> Promise<doc>
 
+function getDoc(testId) {
+  const cached = DOC_CACHE.get(testId);
+  if (cached) { cached.used = Date.now(); return Promise.resolve(cached.doc); }
+  if (!DOC_LOADING.has(testId)) {
+    DOC_LOADING.set(testId, openDoc(testId).finally(() => DOC_LOADING.delete(testId)));
+  }
+  return DOC_LOADING.get(testId);
+}
+
+async function openDoc(testId) {
   const rec = await getPdf(testId);
   if (!rec || !rec.bytes) throw new Error('PDF not imported for ' + testId);
   const pdfjs = await loadPdfjs();
@@ -233,10 +242,13 @@ export class PageViewer {
     if (!keepZoom) this.zoom = 1;
     this.inner.style.transform = '';
     this.spinner.style.display = 'flex';
+    // a newer showPage() may start while this one is still rendering; only the latest may draw
+    const token = this._showToken = (this._showToken || 0) + 1;
     try {
       this._lastW = this.cssWidth;
       const renderW = Math.round(this.cssWidth * this.zoom);
       const { canvas, cssW, cssH } = await renderPage(this.testId, p, renderW);
+      if (token !== this._showToken) return;
       this.inner.innerHTML = '';
       canvas.style.width = cssW + 'px';
       canvas.style.height = cssH + 'px';
@@ -247,9 +259,10 @@ export class PageViewer {
       this.stage.scrollLeft = Math.max(0, (cssW - this.stage.clientWidth) / 2);
       this._updateZoomLabel();
     } catch (e) {
+      if (token !== this._showToken) return;
       this.inner.innerHTML = `<div class="pv-error">שגיאה בטעינת העמוד<br><small>${e.message || e}</small></div>`;
     } finally {
-      this.spinner.style.display = 'none';
+      if (token === this._showToken) this.spinner.style.display = 'none';
     }
     this.onPageChange(p);
     // pre-render neighbours at base width

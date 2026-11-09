@@ -79,12 +79,41 @@ export function validateAnswerSheet(sheet) {
 
 // ---- import answer files ---------------------------------------------------
 
+// Explanation files: { type:'explanations', id:<testId>, sections:{ 'verbal-1':[str,...], ... } }
+// Kept in kv under 'expl:<testId>' so re-importing the answer sheet doesn't drop them.
+export function validateExplanations(obj) {
+  const errors = [];
+  if (!obj.id) errors.push('חסר id');
+  if (!obj.sections || typeof obj.sections !== 'object') errors.push('חסר sections');
+  else for (const [sec, arr] of Object.entries(obj.sections)) {
+    if (!Array.isArray(arr) || !arr.every((x) => x == null || typeof x === 'string')) errors.push(`פרק ${sec}: מצופה מערך של מחרוזות`);
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+const _explCache = new Map();
+export async function getExplanation(q) {
+  if (!q) return null;
+  if (!_explCache.has(q.testId)) _explCache.set(q.testId, await db.kvGet('expl:' + q.testId, null));
+  const secs = _explCache.get(q.testId);
+  const s = secs && secs[q.sectionId];
+  return (s && s[q.n - 1]) || null;
+}
+
 export async function importAnswerFiles(fileList) {
   const result = { imported: [], rejected: [] };
   for (const file of fileList) {
     try {
       const text = await file.text();
       const obj = JSON.parse(text);
+      if (obj && obj.type === 'explanations') {
+        const ve = validateExplanations(obj);
+        if (!ve.ok) { result.rejected.push({ name: file.name, errors: ve.errors }); continue; }
+        await db.kvSet('expl:' + obj.id, obj.sections);
+        _explCache.delete(obj.id);
+        result.imported.push({ id: obj.id, title: obj.title, explanations: true });
+        continue;
+      }
       const v = validateAnswerSheet(obj);
       if (!v.ok) { result.rejected.push({ name: file.name, errors: v.errors }); continue; }
       await db.putAnswerSheet(obj);
@@ -146,11 +175,13 @@ export async function storePdf(testId, fileName, arrayBuffer, pageCount) {
 export async function listTests() {
   const [sheets, pdfMeta] = await Promise.all([db.getAllAnswerSheets(), db.getAllPdfMeta()]);
   const pdfByTest = new Map(pdfMeta.map((p) => [p.testId, p]));
+  const explIds = new Set();
+  await Promise.all(sheets.map(async (s) => { if (await db.kvGet('expl:' + s.id, null)) explIds.add(s.id); }));
   const rows = sheets.map((s) => {
     const pdf = pdfByTest.get(s.id);
     const { year, season } = parseTestId(s.id);
     return {
-      id: s.id, title: s.title, year, season,
+      id: s.id, title: s.title, year, season, hasExpl: explIds.has(s.id),
       hasAnswers: true, hasPdf: !!pdf, pdfName: pdf?.name, pdfSize: pdf?.size || 0,
       pageCount: s.pdfPageCount,
       ready: !!pdf,
@@ -168,7 +199,8 @@ export async function listTests() {
 }
 
 export async function deleteTest(testId) {
-  await Promise.all([db.deleteAnswerSheet(testId), db.deletePdf(testId)]);
+  _explCache.delete(testId);
+  await Promise.all([db.deleteAnswerSheet(testId), db.deletePdf(testId), db.kvDelete('expl:' + testId)]);
 }
 
 export async function getReadyTests() {

@@ -1,7 +1,7 @@
 // config.js — static configuration: topic labels, domains, default timings,
 // exam date, i18n strings. No side effects beyond reading localStorage.
 
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 
 export const DOMAINS = ['verbal', 'quant'];
 
@@ -123,6 +123,7 @@ const STRINGS = {
   'q.correct':   { he: 'נכון', en: 'Correct' },
   'q.wrong':     { he: 'שגוי', en: 'Wrong' },
   'q.correctIs': { he: 'התשובה הנכונה', en: 'Correct answer' },
+  'q.explanation': { he: 'הסבר', en: 'Explanation' },
   'q.timedOut':  { he: 'הזמן נגמר', en: 'Timed out' },
   'q.noQuestions': { he: 'אין שאלות זמינות. ייבאו מבחן מוכן תחילה.', en: 'No questions available. Import a ready test first.' },
 
@@ -240,6 +241,7 @@ const STRINGS = {
   'tests.importAnswers': { he: 'ייבוא קובצי תשובות (JSON)', en: 'Import answer files (JSON)' },
   'tests.importPdfs':    { he: 'ייבוא קובצי PDF', en: 'Import PDFs' },
   'tests.ready':    { he: 'מוכן', en: 'Ready' },
+  'tests.hasExpl':  { he: 'הסברים', en: 'Explanations' },
   'tests.pdfMissing': { he: 'חסר PDF', en: 'PDF missing' },
   'tests.answersMissing': { he: 'חסר קובץ תשובות', en: 'Answer file missing' },
   'tests.empty':    { he: 'עדיין לא יובאו מבחנים.', en: 'No tests imported yet.' },

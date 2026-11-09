@@ -226,6 +226,10 @@ body.chromeless .q-bottom { padding-bottom: calc(10px + var(--safe-bottom)); }
 .fb-correct { color: var(--green); }
 .fb-wrong { color: var(--coral); }
 .fb-timeout { color: var(--amber); }
+.q-expl { margin-top: 8px; padding: 10px 12px; background: var(--surface2); border-inline-start: 3px solid var(--green); border-radius: 10px; max-height: 30vh; overflow-y: auto; font-size: 14px; line-height: 1.6; color: var(--ink); }
+.q-expl-title { font-weight: 700; font-size: 13px; color: var(--green); margin-bottom: 4px; }
+.q-expl-body { white-space: pre-line; }
+.viewer-sheet .q-expl { margin: 0 0 10px; max-height: 22vh; }
 
 .review-banner { padding: 6px 14px; font-size: 14px; color: var(--ink2); }
 
@@ -440,6 +444,7 @@ body.chromeless .q-bottom { padding-bottom: calc(10px + var(--safe-bottom)); }
   .sim-actions .act-btn { flex: 1 1 0; padding: 0 8px; }
   .sim-actions .act-next { margin-inline-start: 0; }
   .q-feedback { font-size: 16px; }
+  .q-expl { margin-top: 0; max-height: none; flex: 0 1 auto; font-size: 15px; }
   .kbd-hint { margin-top: auto; font-size: 12px; line-height: 1.7; color: var(--ink3); }
 }
 

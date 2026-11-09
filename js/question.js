@@ -6,6 +6,7 @@ import { PageViewer } from './pdfview.js';
 import { t, domainLabel, topicLabel, getSettings } from './config.js';
 import { logAttempt, newSessionId } from './stats.js';
 import { Countdown, Stopwatch, formatClock } from './timer.js';
+import { getExplanation } from './tests.js';
 
 function chapterLabel(q) {
   const num = q.sectionId.endsWith('-2') ? 2 : 1;
@@ -64,8 +65,9 @@ export function mountQuestionRunner(root, config) {
   const nextBtn = h('button', { class: 'act-btn act-next', text: t('common.next'), onclick: loadNext, disabled: true });
   const actions = h('div', { class: 'q-actions' }, flagBtn, feedback, nextBtn);
 
+  const explEl = h('div', { class: 'q-expl hidden' });
   const kbdHint = h('div', { class: 'kbd-hint', text: t('kbd.practice') });
-  const bottom = h('div', { class: 'q-bottom' }, answersEl, actions, kbdHint);
+  const bottom = h('div', { class: 'q-bottom' }, answersEl, actions, explEl, kbdHint);
 
   screen.append(topbarSlot, header, timerBar, context, viewerWrap, bottom);
   clear(root).appendChild(screen);
@@ -99,6 +101,7 @@ export function mountQuestionRunner(root, config) {
   async function loadNext() {
     answered = false;
     feedback.classList.add('hidden');
+    explEl.classList.add('hidden');
     nextBtn.disabled = true;
     answerBtns.forEach((b) => { b.className = 'ansbtn'; b.disabled = false; });
     flagBtn.classList.remove('flagged');
@@ -178,6 +181,15 @@ export function mountQuestionRunner(root, config) {
     else if (selected === current.answer) feedback.innerHTML = `<span class="fb-correct">✓ ${t('q.correct')}</span>`;
     else feedback.innerHTML = `<span class="fb-wrong">✗ ${t('q.wrong')}</span> · ${t('q.correctIs')} ${current.answer}`;
     nextBtn.disabled = false;
+    showExplanation(current);
+  }
+
+  async function showExplanation(q) {
+    const text = await getExplanation(q);
+    if (!text || current !== q || !answered) return;
+    clear(explEl).append(h('div', { class: 'q-expl-title', text: '💡 ' + t('q.explanation') }), h('div', { class: 'q-expl-body', text }));
+    explEl.classList.remove('hidden');
+    explEl.scrollTop = 0;
   }
 
   async function record(selected, correct, timedOut) {

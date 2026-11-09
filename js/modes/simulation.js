@@ -3,7 +3,7 @@
 
 import { h, clear, confirmDialog, sheet as bottomSheet, haptic, toast, pct, bindKeys, answerKey } from '../ui.js';
 import { t, domainLabel, topicLabel, getSettings } from '../config.js';
-import { getReadyTests, questionsForSheet } from '../tests.js';
+import { getReadyTests, questionsForSheet, getExplanation } from '../tests.js';
 import * as db from '../db.js';
 import { PageViewer } from '../pdfview.js';
 import { Countdown, Stopwatch, formatClock, formatDuration } from '../timer.js';
@@ -524,13 +524,23 @@ function stat(label, value) {
 function showQuestionPage(sheet, secId, row) {
   const section = sheet.sections.find((s) => s.id === secId);
   sheet_viewer(sheet.id, { first: section.pdfPages.first, last: section.pdfPages.last, page: row.page },
-    `#${row.n} · ${t('q.correctIs')}: ${row.correct} · ${t('res.yourAnswer')}: ${row.selected ?? '—'}`);
+    `#${row.n} · ${t('q.correctIs')}: ${row.correct} · ${t('res.yourAnswer')}: ${row.selected ?? '—'}`,
+    { testId: sheet.id, sectionId: secId, n: row.n });
 }
 
-function sheet_viewer(testId, range, caption) {
+function sheet_viewer(testId, range, caption, q = null) {
   bottomSheet((close) => {
     const panel = h('div', { class: 'viewer-sheet' });
     panel.appendChild(h('div', { class: 'viewer-caption', text: caption }));
+    if (q) {
+      const explEl = h('div', { class: 'q-expl hidden' });
+      panel.appendChild(explEl);
+      getExplanation(q).then((text) => {
+        if (!text) return;
+        explEl.append(h('div', { class: 'q-expl-title', text: '💡 ' + t('q.explanation') }), h('div', { class: 'q-expl-body', text }));
+        explEl.classList.remove('hidden');
+      });
+    }
     const host = h('div', { class: 'q-viewer sheet-viewer' });
     const wrap = h('div', { class: 'q-viewerwrap' }, host,
       h('button', { class: 'q-pagebtn q-prev', text: '‹', onclick: () => v && v.prev() }),

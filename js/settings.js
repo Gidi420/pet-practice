@@ -163,6 +163,7 @@ async function renderTestList(listEl, root) {
         h('div', { class: 'test-row-sub' },
           h('span', { class: 'status-badge ' + cls, text: status }),
           r.hasPdf ? h('span', { class: 'muted tiny', text: ` · ${(r.pdfSize / 1048576).toFixed(1)}MB` }) : null,
+          r.hasExpl ? h('span', { class: 'muted tiny', text: ` · 💡 ${t('tests.hasExpl')}` }) : null,
         ),
         bestChips.length ? h('div', { class: 'best-chips' }, ...bestChips) : null,
       ),

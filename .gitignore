@@ -2,6 +2,7 @@
 /private/
 *.pdf
 *.answers.json
+*.explanations.json
 
 # OS / editor junk
 .DS_Store

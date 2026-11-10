@@ -103,26 +103,42 @@ export async function getExplanation(q) {
 export async function importAnswerFiles(fileList) {
   const result = { imported: [], rejected: [] };
   for (const file of fileList) {
+    let parsed;
     try {
-      const text = await file.text();
-      const obj = JSON.parse(text);
-      if (obj && obj.type === 'explanations') {
-        const ve = validateExplanations(obj);
-        if (!ve.ok) { result.rejected.push({ name: file.name, errors: ve.errors }); continue; }
-        await db.kvSet('expl:' + obj.id, obj.sections);
-        _explCache.delete(obj.id);
-        result.imported.push({ id: obj.id, title: obj.title, explanations: true });
-        continue;
-      }
-      const v = validateAnswerSheet(obj);
-      if (!v.ok) { result.rejected.push({ name: file.name, errors: v.errors }); continue; }
-      await db.putAnswerSheet(obj);
-      result.imported.push({ id: obj.id, title: obj.title });
+      parsed = JSON.parse(await file.text());
     } catch (e) {
       result.rejected.push({ name: file.name, errors: [String(e.message || e)] });
+      continue;
+    }
+    // One file may hold many sheets: a JSON array, or { type:'bundle', items:[...] }.
+    const items = Array.isArray(parsed) ? parsed
+      : (parsed && parsed.type === 'bundle' && Array.isArray(parsed.items)) ? parsed.items
+      : [parsed];
+    for (const obj of items) {
+      const name = items.length > 1 ? `${file.name} (${(obj && obj.id) || '?'})` : file.name;
+      try {
+        await importOne(obj, name, result);
+      } catch (e) {
+        result.rejected.push({ name, errors: [String(e.message || e)] });
+      }
     }
   }
   return result;
+}
+
+async function importOne(obj, name, result) {
+  if (obj && obj.type === 'explanations') {
+    const ve = validateExplanations(obj);
+    if (!ve.ok) { result.rejected.push({ name, errors: ve.errors }); return; }
+    await db.kvSet('expl:' + obj.id, obj.sections);
+    _explCache.delete(obj.id);
+    result.imported.push({ id: obj.id, title: obj.title, explanations: true });
+    return;
+  }
+  const v = validateAnswerSheet(obj);
+  if (!v.ok) { result.rejected.push({ name, errors: v.errors }); return; }
+  await db.putAnswerSheet(obj);
+  result.imported.push({ id: obj.id, title: obj.title });
 }
 
 // ---- PDF matching ----------------------------------------------------------
